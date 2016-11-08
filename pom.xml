@@ -3,14 +3,12 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>fr.lirmm.graphik</groupId>
-	<artifactId>graal-main-project</artifactId>
+	<artifactId>graal-extra</artifactId>
 	<version>1.2.1-SNAPSHOT</version>
-	<name>fr.lirmm.graphik:graal-main-project</name>
+	<name>fr.lirmm.graphik:graal-extra</name>
 	<packaging>pom</packaging>
 
-	<description>Graal is a java toolkit dedicated to ontological query answering in the framework of existential rules. We consider knowledge bases composed of data and an ontology expressed by existential rules. The main features of Graal are the following: a basic layer that provides generic interfaces to store and query various kinds of data, forward chaining and query rewriting
-algorithms, structural analysis of decidability properties of a rule set, a textual format and its parser, and import of OWL 2 files. We describe in more detail the query rewriting algorithms, which rely on original techniques, and report some experiments.
-	</description>
+	<description>Graal extra contains extra modules for graal.</description>
 
 	<url>https://graphik-team.github.io/graal/</url>
 	<inceptionYear>2014</inceptionYear>
@@ -55,39 +53,15 @@ algorithms, structural analysis of decidability properties of a rule set, a text
 	</properties>
 
 	<modules>
-		<module>graal</module>
 		<module>graal-apps</module>
 		<module>graal-examples</module>
 		<module>graal-distro</module>
-		<module>graal-extra</module>
+		<module>graal-chase-bench</module>
 		<module>graal-incubator</module>
 	</modules>
 
 	<dependencies>
 	</dependencies>
-
-	<profiles>
-		<profile>
-			<id>release</id>
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>org.apache.maven.plugins</groupId>
-						<artifactId>maven-gpg-plugin</artifactId>
-						<executions>
-							<execution>
-								<id>sign-artifacts</id>
-								<phase>verify</phase>
-								<goals>
-									<goal>sign</goal>
-								</goals>
-							</execution>
-						</executions>
-					</plugin>
-				</plugins>
-			</build>
-		</profile>
-	</profiles>
 
 	<build>
 		<plugins>
@@ -167,39 +141,7 @@ algorithms, structural analysis of decidability properties of a rule set, a text
 					<excludeFilterFile>${project.basedir}/config/findbugs/exclude-filter.xml</excludeFilterFile>
 				</configuration>
 			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-site-plugin</artifactId>
-				<version>3.4</version>
-				<configuration>
-					<stagingDirectory>/tmp/graal-site/</stagingDirectory>
-				</configuration>
-			</plugin>
 		</plugins>
 	</build>
-
-	<reporting>
-		<plugins>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-javadoc-plugin</artifactId>
-				<version>2.10.1</version>
-				<configuration>
-					<show>public</show>
-				</configuration>
-			</plugin>
-		</plugins>
-	</reporting>
-
-	<distributionManagement>
-		<snapshotRepository>
-			<id>ossrh</id>
-			<url>https://oss.sonatype.org/content/repositories/snapshots</url>
-		</snapshotRepository>
-		<repository>
-			<id>ossrh</id>
-			<url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-		</repository>
-	</distributionManagement>
 
 </project>
