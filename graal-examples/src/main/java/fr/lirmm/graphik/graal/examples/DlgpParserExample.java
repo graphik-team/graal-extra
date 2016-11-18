@@ -47,11 +47,12 @@ import java.io.FileReader;
 import java.io.IOException;
 
 import fr.lirmm.graphik.graal.api.core.Atom;
-import fr.lirmm.graphik.graal.api.core.AtomSetException;
 import fr.lirmm.graphik.graal.api.core.ConjunctiveQuery;
+import fr.lirmm.graphik.graal.api.core.InMemoryAtomSet;
 import fr.lirmm.graphik.graal.api.core.NegativeConstraint;
 import fr.lirmm.graphik.graal.api.core.Rule;
-import fr.lirmm.graphik.graal.api.io.ParseException;
+import fr.lirmm.graphik.graal.api.io.GraalWriter;
+import fr.lirmm.graphik.graal.core.atomset.LinkedListAtomSet;
 import fr.lirmm.graphik.graal.io.dlp.DlgpParser;
 import fr.lirmm.graphik.graal.io.dlp.DlgpWriter;
 
@@ -61,11 +62,33 @@ import fr.lirmm.graphik.graal.io.dlp.DlgpWriter;
  */
 public class DlgpParserExample {
 
-	public static void main(String[] args) throws ParseException, AtomSetException, InterruptedException, IOException {
+	public static class Handler implements Thread.UncaughtExceptionHandler {
 
-		DlgpParser parser = new DlgpParser(new BufferedReader(new FileReader("./src/main/resources/example.dlp")));
+		private GraalWriter writer;
 
+		/**
+		 * @param writer
+		 */
+		public Handler(GraalWriter writer) {
+			this.writer = writer;
+		}
+
+		@Override
+		public void uncaughtException(Thread arg0, Throwable arg1) {
+			try {
+				writer.write("An error occured");
+			} catch (IOException e) {
+			}
+		}
+
+	}
+
+	public static void main(String[] args) throws IOException {
 		DlgpWriter writer = new DlgpWriter();
+		writer.write("%% read exemple1.dlp\n");
+		DlgpParser parser = new DlgpParser(new BufferedReader(new FileReader("./src/main/resources/example.dlp")),
+		                                   new Handler(writer));
+
 		while (parser.hasNext()) {
 			Object o = parser.next();
 			if (o instanceof NegativeConstraint)
@@ -77,6 +100,59 @@ public class DlgpParserExample {
 			else if (o instanceof ConjunctiveQuery)
 				writer.write((ConjunctiveQuery) o);
 		}
+		parser.close();
+
+		writer.write("\n%% read exemple2.dlp\n");
+
+		parser = new DlgpParser(new BufferedReader(new FileReader("./src/main/resources/example2.dlp")),
+		                        new Handler(writer));
+
+		while (parser.hasNext()) {
+			Object o = parser.next();
+			if (o instanceof NegativeConstraint)
+				writer.write((NegativeConstraint) o);
+			else if (o instanceof Rule)
+				writer.write((Rule) o);
+			else if (o instanceof Atom)
+				writer.write((Atom) o);
+			else if (o instanceof ConjunctiveQuery)
+				writer.write((ConjunctiveQuery) o);
+		}
+		parser.close();
+
+		writer.write("\n%% read dlp from java\n");
+
+		try {
+			writer.write(DlgpParser.parseAtom("p(a,b)."));
+		} catch (Exception e) {
+			writer.write("An error occured");
+		}
+
+		try {
+			writer.write(DlgpParser.parseRule("p(X,Y) :- q(Y,X)."));
+		} catch (Exception e) {
+			writer.write("An error occured");
+		}
+
+		try {
+			writer.write(DlgpParser.parseQuery(" ?(X) :- p(X,Y), q(Y,X)."));
+		} catch (Exception e) {
+			writer.write("An error occured");
+		}
+
+		try {
+			writer.write((NegativeConstraint) DlgpParser.parseNegativeConstraint("! :- p(X,Y), q(X,Y)."));
+		} catch (Exception e) {
+			writer.write("An error occured");
+		}
+
+		try {
+			InMemoryAtomSet atomset = new LinkedListAtomSet(DlgpParser.parseAtomSet("p(a,b), q(b,c)."));
+			writer.write(atomset);
+		} catch (Exception e) {
+			writer.write("An error occured");
+		}
+
 		writer.close();
 
 	}

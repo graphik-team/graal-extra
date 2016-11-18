@@ -1,17 +1,21 @@
-[f1] p(X),r(X,b),q(b).
-[f2]t(X,a), s(a,z).
-[c1] ! :- r(X,X) .
-% Ceci est un commentaire
-[q1]?(X) :- p(X),r(X,Z), t(a,Z).
-[r1]r(X,Y):-p(X) , t(X,Z). [contrainte_2]! :- X = X.
-[f3] q(a),r(a,X), % Autre commentaire
-t(a,z).
-s(X,Y),s(Y,Z)
-:-
-q(X),t(X,Z).
-s(Z):-a=b,X=Y.
-@Facts t(X,a), r(Y,z).
-@Rules
-[rA_1]p(X):-q(X).
-!:-p(X),q(X). @Queries
-? :- p(X).
+
+@facts
+[f1] p(X), r(X,b), q(b).
+[f2] t(X,a), s(a,z).
+[f3] q(a), r(a,X), t(a,z).
+t(X,a), r(Y,z).
+
+@constraints
+[c1] !  :- r(X,X).
+[contrainte 2] !  :- X=X.
+!  :- p(X), q(X).
+
+@rules
+[r1] r(X,Y) :- p(X), t(X,Z).
+s(X,Y), s(Y,Z) :- q(X),t(X,Z).
+s(Z) :- a=b, X=Y.
+[rA 1] p(X) :- q(X).
+
+@queries
+[q1] ?  (X) :- p(X), r(X,Z), t(a,Z).
+?  :- p(X).
