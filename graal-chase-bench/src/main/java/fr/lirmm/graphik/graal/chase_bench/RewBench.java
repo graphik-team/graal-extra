@@ -38,8 +38,8 @@ import fr.lirmm.graphik.graal.core.ruleset.LinkedListRuleSet;
 import fr.lirmm.graphik.graal.homomorphism.StaticHomomorphism;
 import fr.lirmm.graphik.graal.store.rdbms.adhoc.AdHocRdbmsStore;
 import fr.lirmm.graphik.graal.store.rdbms.driver.PostgreSQLDriver;
-import fr.lirmm.graphik.util.Profiler;
-import fr.lirmm.graphik.util.RealTimeProfiler;
+import fr.lirmm.graphik.util.profiler.Profiler;
+import fr.lirmm.graphik.util.profiler.RealTimeProfiler;
 import fr.lirmm.graphik.util.stream.CloseableIterator;
 import fr.lirmm.graphik.util.stream.IteratorAdapter;
 
