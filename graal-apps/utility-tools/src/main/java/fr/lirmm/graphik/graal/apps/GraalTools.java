@@ -91,7 +91,9 @@ public class GraalTools {
 				}
 				writer.write(r);
 			}
-		} else if (options.singlepiece) {
+		}
+		
+		if (options.singlepiece) {
 			Rule r;
 			System.out.println("%%%% SINGLE PIECE %%%%");
 			Iterator<Rule> it = Rules.computeSinglePiece(rules.iterator());
@@ -102,7 +104,9 @@ public class GraalTools {
 				}
 				writer.write(r);
 			}
-		} else if (options.labeler) {
+		}
+		
+		if (options.labeler && !options.atomic && !options.singlepiece) {
 			for (Rule r : rules) {
 				r.setLabel(computeLabel(r));
 				writer.write(r);
