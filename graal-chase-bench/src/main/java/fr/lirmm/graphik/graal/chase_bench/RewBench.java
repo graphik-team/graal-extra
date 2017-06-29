@@ -32,7 +32,7 @@ import fr.lirmm.graphik.graal.chase_bench.io.ChaseBenchQueryParser;
 import fr.lirmm.graphik.graal.chase_bench.io.ChaseBenchRuleParser;
 import fr.lirmm.graphik.graal.chase_bench.io.ChaseBenchWriter;
 import fr.lirmm.graphik.graal.core.DefaultUnionOfConjunctiveQueries;
-import fr.lirmm.graphik.graal.core.atomset.graph.DefaultInMemoryGraphAtomSet;
+import fr.lirmm.graphik.graal.core.atomset.graph.DefaultInMemoryGraphStore;
 import fr.lirmm.graphik.graal.core.compilation.IDCompilation;
 import fr.lirmm.graphik.graal.core.ruleset.LinkedListRuleSet;
 import fr.lirmm.graphik.graal.homomorphism.StaticHomomorphism;
@@ -108,7 +108,7 @@ public class RewBench {
 			                                                     options.databaseUser, options.databasePassword));
 		} else {
 		// Alternatively, you can use an in memory graph based AtomSet
-			atomSet = new DefaultInMemoryGraphAtomSet();
+			atomSet = new DefaultInMemoryGraphStore();
 		}
 
 		// Parsing data //

@@ -19,13 +19,10 @@ import fr.lirmm.graphik.graal.api.core.Rule;
 import fr.lirmm.graphik.graal.api.core.RuleSet;
 import fr.lirmm.graphik.graal.api.core.Substitution;
 import fr.lirmm.graphik.graal.api.core.Term;
-import fr.lirmm.graphik.graal.api.core.Term.Type;
 import fr.lirmm.graphik.graal.api.core.Variable;
 import fr.lirmm.graphik.graal.api.forward_chaining.Chase;
 import fr.lirmm.graphik.graal.api.forward_chaining.ChaseException;
-import fr.lirmm.graphik.graal.api.forward_chaining.ChaseHaltingCondition;
 import fr.lirmm.graphik.graal.api.forward_chaining.RuleApplicationException;
-import fr.lirmm.graphik.graal.api.forward_chaining.RuleApplier;
 import fr.lirmm.graphik.graal.api.homomorphism.HomomorphismException;
 import fr.lirmm.graphik.graal.api.io.GraalWriter;
 import fr.lirmm.graphik.graal.api.io.Parser;
@@ -34,14 +31,16 @@ import fr.lirmm.graphik.graal.chase_bench.io.ChaseBenchQueryParser;
 import fr.lirmm.graphik.graal.chase_bench.io.ChaseBenchRuleParser;
 import fr.lirmm.graphik.graal.chase_bench.io.ChaseBenchWriter;
 import fr.lirmm.graphik.graal.core.DefaultConjunctiveQuery;
-import fr.lirmm.graphik.graal.core.atomset.graph.DefaultInMemoryGraphAtomSet;
+import fr.lirmm.graphik.graal.core.atomset.graph.DefaultInMemoryGraphStore;
 import fr.lirmm.graphik.graal.core.compilation.IDCompilation;
+import fr.lirmm.graphik.graal.core.factory.DefaultConjunctiveQueryFactory;
+import fr.lirmm.graphik.graal.core.grd.DefaultGraphOfRuleDependencies;
 import fr.lirmm.graphik.graal.core.ruleset.LinkedListRuleSet;
-import fr.lirmm.graphik.graal.forward_chaining.ConfigurableChase;
+import fr.lirmm.graphik.graal.core.unifier.checker.AtomErasingChecker;
+import fr.lirmm.graphik.graal.core.unifier.checker.ProductivityChecker;
+import fr.lirmm.graphik.graal.forward_chaining.BreadthFirstChase;
+import fr.lirmm.graphik.graal.forward_chaining.ChaseWithGRD;
 import fr.lirmm.graphik.graal.forward_chaining.SccChase;
-import fr.lirmm.graphik.graal.forward_chaining.rule_applier.TestRuleApplier;
-import fr.lirmm.graphik.graal.grd.AtomErasingFilter;
-import fr.lirmm.graphik.graal.grd.GraphOfRuleDependencies;
 import fr.lirmm.graphik.graal.homomorphism.StaticHomomorphism;
 import fr.lirmm.graphik.graal.store.rdbms.adhoc.AdHocRdbmsStore;
 import fr.lirmm.graphik.graal.store.rdbms.driver.PostgreSQLDriver;
@@ -58,8 +57,8 @@ import fr.lirmm.graphik.util.stream.Iterators;
  */
 public class ChaseBench {
 
-	//@Parameter(names = { "-c", "--chase" }, description = "GRD|GRD2|UNIF|LIN|NAIVE|SCC|SEMI|NEG")
-	String chase = "NEG";
+	@Parameter(names = { "-c", "--chase" }, description = "GRD|SCC|BREADTH")
+	String chase = "SCC";
 	
 	@Parameter(names = { "-m", "--mode" }, description = "MEM|SQL InMemory or PostgreSQL")
 	String mode = "MEM";
@@ -91,11 +90,17 @@ public class ChaseBench {
 	@Parameter(names = { "--queries" }, description = "queries directory path")
 	String inputQueryDirPath = "";
 	
+	@Parameter(names = { "--lin" }, description = "Enable specific chase for linear ontologies")
+	Boolean linear = false;
+	
 	@Parameter(names = { "-u, --uniq" }, description = "ensure unicity on query answers", arity = 1)
 	boolean uniq = true;
 	
 	@Parameter(names = {"-C", "--compilation"}, arity = 1)
 	boolean compilation = true;
+	
+	@Parameter(names = {"-O", "--opti"}, arity = 1)
+	boolean opti = false;
 	
 	@Parameter(names = {"-v", "--verbose"})
 	boolean verbose = false;
@@ -134,12 +139,12 @@ public class ChaseBench {
 				// "papotti", "clement", "clement"));
 				atomSetSrc = new AdHocRdbmsStore(new PostgreSQLDriver(options.databaseHost, options.databaseName,
 				                                                     options.databaseUser, options.databasePassword));
-				atomSetDest = new DefaultInMemoryGraphAtomSet();
+				atomSetDest = new DefaultInMemoryGraphStore();
 	
 			} else {
 				// Alternatively, you can use an in memory graph based AtomSet
-				atomSetSrc = new DefaultInMemoryGraphAtomSet();
-				atomSetDest = new DefaultInMemoryGraphAtomSet();
+				atomSetSrc = new DefaultInMemoryGraphStore();
+				atomSetDest = new DefaultInMemoryGraphStore();
 			}
 	
 			// Parsing data //
@@ -171,69 +176,65 @@ public class ChaseBench {
 			// condition.
 			prof.start("total chase time");
 			prof.start("st-tgds chase");
-			if(options.aa) {
-				Chase chase = new ConfigurableChase(stTgdsSet, atomSetSrc, new ChaseHaltingCondition() {
-					
-		
-					@Override
-					public CloseableIterator<Atom> apply(Rule rule, Substitution substitution, AtomSet data) {
-					// replace variables by fresh symbol
-					for (Variable t : rule.getExistentials()) {
-						substitution.put(t, data.getFreshSymbolGenerator().getFreshCst());
+			{
+				for(Rule r : stTgdsSet) { 					
+					ConjunctiveQuery query = DefaultConjunctiveQueryFactory.instance().create(r.getBody(),
+				        new LinkedList<Term>(r.getFrontier()));
+					CloseableIterator<Substitution> subIt = StaticHomomorphism.instance().execute(query, atomSetSrc);
+					while (subIt.hasNext()) {
+						Substitution substitution = subIt.next();
+						// replace variables by fresh symbol 
+						for (Variable t : r.getExistentials()) { 
+							substitution.put(t, atomSetDest.getFreshSymbolGenerator().getFreshSymbol()); 
+						}
+						atomSetDest.addAll(substitution.createImageOf(r.getHead()));
 					}
 					
-					return substitution.createImageOf(rule.getHead()).iterator();
-					}
-			
-					
-				
-				});
-				chase.next();
-				atomSetDest = atomSetSrc;
-			} else {
-				RuleApplier applier = new TestRuleApplier<AtomSet>(atomSetDest, new ChaseHaltingCondition() {
-					
-					@Override
-					public CloseableIterator<Atom> apply(Rule rule, Substitution substitution, AtomSet data) {
-					// replace variables by fresh symbol
-					for (Variable t : rule.getExistentials()) {
-						substitution.put(t, data.getFreshSymbolGenerator().getFreshCst());
-					}
-					
-					return substitution.createImageOf(rule.getHead()).iterator();
-					}
-
-			
-				});
-				for(Rule r : stTgdsSet) {
-					applier.apply(r, atomSetSrc);
 				}
+
 			}
 			prof.stop("st-tgds chase");
 		}
+		
 
 		/////////////////////////////////////////
 		//
 		
 		Chase chase;
 		if(!targetTgdsSet.isEmpty()) {
-			/*prof.start("Check linearity");
-			boolean isLinear = true;
-			for (Rule r : targetTgdsSet) {
-				if (!isLinear(r)) {
-					isLinear = false;
-					break;
+			boolean isLinear = false;
+			if(options.linear) {
+				prof.start("Check linearity");
+				isLinear = true;
+				for (Rule r : targetTgdsSet) {
+					if (!isLinear(r)) {
+						isLinear = false;
+						break;
+					}
 				}
+				prof.stop("Check linearity");
+				prof.trace("tgds set linearity: " + isLinear);
+		
+		
 			}
-			prof.stop("Check linearity");
-			prof.trace("tgds set linearity: " + isLinear);*/
-	
 			chase = null;
 			prof.start("preproccessing chase");
-			/*if (false && isLinear) {
-				chase = new DefaultChase(targetTgdsSet, atomSetDest);
-			} else {*/
-				if(options.compilation) {
+			if (isLinear) {
+				chase = new BreadthFirstChase(targetTgdsSet, atomSetDest);
+			} else {
+				if(options.opti) {
+					IDCompilation comp = new IDCompilation();
+					comp.compile(targetTgdsSet.iterator());
+					Chase c = new BreadthFirstChase(comp.getSaturation(), atomSetDest);
+					c.next();
+					
+					for(Rule r : targetTgdsSet) {
+						c = new BreadthFirstChase(comp.getSaturation(), r.getHead());
+						c.next();
+						System.out.println(r);
+					}
+					
+				} else if(options.compilation) {
 					prof.start("Rule compilation computing time");
 					IDCompilation comp = new IDCompilation();
 					comp.compile(targetTgdsSet.iterator());
@@ -242,40 +243,25 @@ public class ChaseBench {
 					}
 					prof.stop("Rule compilation computing time");
 				}
+				
 				prof.start("Graph of Rule Dependencies computing time");
-				GraphOfRuleDependencies grd = new GraphOfRuleDependencies(targetTgdsSet.iterator(), false, new AtomErasingFilter());
+				DefaultGraphOfRuleDependencies grd = new DefaultGraphOfRuleDependencies(targetTgdsSet.iterator(), false, AtomErasingChecker.instance(), ProductivityChecker.instance());
 				prof.stop("Graph of Rule Dependencies computing time");
-				/*if(options.chase.equals("GRD")) {
-					System.out.println("GRD");
+				if(options.chase.equals("GRD")) {
 					chase = new ChaseWithGRD(grd, atomSetDest);
-				} else if (options.chase.equals("GRD2")) {
-					System.out.println("GRD2");
-					chase = new ChaseWithGRDOld(grd,atomSetDest);
-				} else if (options.chase.equals("UNIF")) {
-					System.out.println("UNIF");
-					chase = new ChaseWithGRDAndUnfiers(grd, atomSetDest);
-				} else if (options.chase.equals("LIN")) {
-					System.out.println("LIN");
-					chase = new DefaultChase(targetTgdsSet, atomSetDest);
-				} else if(options.chase.equals("SEMI")) {
-					System.out.println("SEMI");
-					chase = new SemiNaiveChase(grd, atomSetDest);
 				} else if(options.chase.equals("SCC")) {
-					System.out.println("SCC");
 					chase = new SccChase(grd, atomSetDest);
-				} else if(options.chase.equals("NEG")) {*/
-						//System.out.println("NEG");
-						chase = new SccChase(grd, atomSetDest);
-				/*} else {
-					System.out.println("NAIVE");
-					chase = new ConfigurableChase(targetTgdsSet, atomSetDest);
-				}*/
-			//}
+				} else if(options.chase.equals("BREADTH")) {
+					chase = new BreadthFirstChase(targetTgdsSet, atomSetDest);
+				}
+			}
 			prof.stop("preproccessing chase");
 
 			prof.put("chase", chase.getClass());
 			prof.start("t-tgds chase");
 			profile(chase);
+			System.out.println("Nb terms :");
+			System.out.println((Iterators.count(atomSetDest.termsIterator())));
 			prof.stop("t-tgds chase");
 	
 		}
@@ -352,26 +338,23 @@ public class ChaseBench {
 	 */
 	private static void profile(Chase chase) throws ChaseException {
 		chase.execute();
+		System.gc();
 	}
 
 	protected static void writeTerm(GraalWriter w, Term t) throws IOException {
-		if (Type.VARIABLE.equals(t.getType())) {
+		if (t.isVariable()) {
 			w.write("?" + t.getIdentifier());
-		} else if (Type.CONSTANT.equals(t.getType())) {
-			w.write(t.getIdentifier());
-		} else { // LITERAL
+		} else if (t.isLiteral()) {
 			writeLiteral(w, (Literal) t);
+		} else { // Constant
+			w.write(t.getIdentifier());
 		}
 	}
 
 	protected static void writeLiteral(GraalWriter w, Literal l) throws IOException {
-		if (l.getValue() instanceof String) {
-			w.write('"');
-			w.write(l.getValue());
-			w.write('"');
-		} else {
-			w.write(l.getValue().toString());
-		}
+		w.write("\"");
+		w.write(l.getValue().toString());
+		w.write("\"");
 	}
 
 	protected static boolean isLinear(Rule r) {
